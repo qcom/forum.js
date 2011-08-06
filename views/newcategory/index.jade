@@ -1,0 +1,20 @@
+!!!
+html
+  head
+    title new category
+    link(rel='stylesheet', href='/stylesheets/style.css')
+  body
+    h1 new category
+    form(method='post', action='/new/category')
+      p
+        label name
+        input(type='text', name='name')
+      p
+        label guardian
+        select(name='guardian')
+          option(value='none') none
+          - if(categories !== null)
+            - each category in categories
+              option(value= category.name) #{category.name}
+      p
+        input(type='submit', value='Submit')
