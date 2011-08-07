@@ -3,7 +3,6 @@
 var express = require('express');
 var redis = require('redis');
 var client = redis.createClient();
-var cradle = require('cradle');
 var RedisStore = require('connect-redis')(express);
 var crypto = require('crypto');
 
@@ -32,65 +31,77 @@ app.configure('production', function(){
   app.use(express.errorHandler()); 
 });
 
-// Cradle
-
-var c = new(cradle.Connection)();
-var db = c.database('forum');
-db.create();
-
 // Dynamic Helpers
 
 app.dynamicHelpers({
 	categories: function(req, res){
-		var categories = [];
+		var cats = [];
 		client.get('nextcid', function(err, cid){
-			for (var i = 1; i <= cid; i++){
-				db.get(i.toString(), function(err, category){
-					categories.push(category);
-				});
-			}
+	    for (var i = 1; i <= cid; i++){
+		    client.hgetall('cid:' + cid, function(err, category){
+			    cats.push(category);
+    		});
+	    }
 		});
-		return categories;
+		return cats;
 	}
 });
 
 // Routes
 
 function newCategory(req, res, next){
-	var data = req.body;
-	client.get('category.name:' + data.name + ':cid', function(err, cid){
-		if (cid !== null){
-			res.render('newcategory', {
-				flash: 'category already in use!'
-			});
-		}
-		else{
-			client.incr('nextcid', function(err, cid){
-				data.cid = cid;
-				client.set('category.name:' + data.name + ':cid', cid);
-				client.set('cid:' + cid + ':category.name', + data.name);
-				db.save(cid.toString(), data, function(db_err, db_res){
-					res.render('newcategory', {
-						flash: 'category created!'
-					});
-				});
-			});
-		}
-	});
+  var name = req.body.name;
+  var description = req.body.description;
+  var guardian = req.body.guardian;
+  client.get('category.name:' + name + ':cid', function(err, cid){
+    if (cid !== null){
+      res.redirect('back');
+    }
+    else{
+      client.incr('nextcid', function(err, cid){
+        client.incr('nextgid', function(err, gid){
+          client.incr('nextaid', function(err, aid){
+            client.set('cid:' + cid + ':category.name', name);
+            client.set('category.name:' + name + ':cid', cid);
+            
+            if (guardian !== 'none'){
+              client.get('category.name:' + guardian + ':cid', function(err, guardianCID){
+                client.hset('cid:' + cid, 'guardian', guardianCID);
+              });
+            }
+            
+            client.hmset('cid:' + cid, {
+              cid: cid,
+              gid: gid,
+              aid: aid,
+              threads: 0,
+              name: name,
+              desciption: description
+            });
+            
+            client.hgetall('cid:' + cid, function(err, newcategory){
+              req.newcategory = newcategory;
+              next();
+            });
+          });
+        });
+      });
+    }
+  });
 }
 
 app.param('categoryName', function(req, res, next, categoryName){
-	client.get('category.name:' + categoryName + ':cid', function(err, cid){
-		if (cid !== null){
-			db.get(cid, function(err, category){
-				req.category = category;
-				next();
-			});
-		}
-		else{
-			next(new Error('not a category'));
-		}
-	});
+  client.get('category.name:' + categoryName + ':cid', function(err, cid){
+    if (cid !== null){
+      client.hgetall('cid:' + cid, function(err, category){
+        req.category = category;
+        next();
+      });
+    }
+    else{
+      next(new Error('not a category'));
+    }
+  });
 });
 
 app.get('/', function(req, res){

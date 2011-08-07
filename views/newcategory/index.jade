@@ -10,11 +10,9 @@ html
         label name
         input(type='text', name='name')
       p
+        label description
+        input(type='text', name='description')
+      p
         label guardian
-        select(name='guardian')
-          option(value='none') none
-          - if(categories !== null)
-            - each category in categories
-              option(value= category.name) #{category.name}
       p
         input(type='submit', value='Submit')

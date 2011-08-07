@@ -5,3 +5,7 @@ html
     link(rel='stylesheet', href='/stylesheets/style.css')
   body
     h1 forum
+    p
+      a(href='/') home
+    - each category in categories
+      li= category.length
